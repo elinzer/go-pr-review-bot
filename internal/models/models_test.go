@@ -1,6 +1,9 @@
 package models
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestChangedFilePathsDeduplicates(t *testing.T) {
 	ctx := PRContext{
@@ -30,19 +33,34 @@ func TestChangedFilePathsEmpty(t *testing.T) {
 	}
 }
 
-func TestSeverityValid(t *testing.T) {
-	tests := []struct {
-		severity Severity
-		want     bool
-	}{
-		{SeverityBug, true},
-		{SeverityQuestion, true},
-		{Severity("style"), false},
-		{Severity(""), false},
+func TestTotalsSumFiles(t *testing.T) {
+	ctx := PRContext{Files: []FileChange{{Additions: 3, Deletions: 1}, {Additions: 10, Deletions: 4}}}
+	add, del := ctx.Totals()
+	if add != 13 || del != 5 {
+		t.Errorf("Totals() = (%d, %d), want (13, 5)", add, del)
 	}
-	for _, tt := range tests {
-		if got := tt.severity.Valid(); got != tt.want {
-			t.Errorf("Severity(%q).Valid() = %v, want %v", tt.severity, got, tt.want)
+}
+
+func TestAlignmentStatusValid(t *testing.T) {
+	for _, s := range []AlignmentStatus{AlignmentMet, AlignmentGap, AlignmentExtra, AlignmentUnclear} {
+		if !s.Valid() {
+			t.Errorf("%q.Valid() = false, want true", s)
 		}
+	}
+	for _, s := range []AlignmentStatus{"", "done", "MET"} {
+		if s.Valid() {
+			t.Errorf("%q.Valid() = true, want false", s)
+		}
+	}
+}
+
+func TestBriefingJSONTags(t *testing.T) {
+	raw := `{"ticket_summary":"t","pr_summary":"p","ticket_alignment":[{"status":"gap","note":"n"}],"where_to_look":[{"file":"a.go","line":4,"why":"w"}]}`
+	var b Briefing
+	if err := json.Unmarshal([]byte(raw), &b); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if b.TicketSummary != "t" || b.PRSummary != "p" || b.TicketAlignment[0].Status != AlignmentGap || b.WhereToLook[0].Line != 4 {
+		t.Errorf("decoded %+v", b)
 	}
 }

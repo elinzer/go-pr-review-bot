@@ -11,15 +11,27 @@ type PullRequestSummary struct {
 }
 
 type FileChange struct {
-	Path      string
-	Patch     string
-	Additions int
-	Deletions int
+	Path         string
+	Patch        string
+	Additions    int
+	Deletions    int
+	PreviousPath string
+	Status       string
+	FullContent  string
 }
 
 type PRContext struct {
-	Summary PullRequestSummary
-	Files   []FileChange
+	Summary      PullRequestSummary
+	Files        []FileChange
+	OtherChanges []string
+}
+
+func (c PRContext) Totals() (additions, deletions int) {
+	for _, f := range c.Files {
+		additions += f.Additions
+		deletions += f.Deletions
+	}
+	return additions, deletions
 }
 
 func (c PRContext) ChangedFilePaths() map[string]struct{} {
@@ -31,37 +43,51 @@ func (c PRContext) ChangedFilePaths() map[string]struct{} {
 }
 
 type JiraContext struct {
-	Key                string
-	Title              string
-	Description        string
-	AcceptanceCriteria string
+	Key          string
+	Title        string
+	Description  string
+	Epic         string
+	LinkedIssues []string
 }
 
-type Evidence struct {
-	QuotedCode string `json:"quoted_code"`
-	Citation   string `json:"citation"`
-}
-
-type Severity string
+type AlignmentStatus string
 
 const (
-	SeverityBug      Severity = "bug"
-	SeverityQuestion Severity = "question"
+	AlignmentMet     AlignmentStatus = "met"
+	AlignmentGap     AlignmentStatus = "gap"
+	AlignmentExtra   AlignmentStatus = "extra"
+	AlignmentUnclear AlignmentStatus = "unclear"
 )
 
-func (s Severity) Valid() bool {
-	return s == SeverityBug || s == SeverityQuestion
+func (s AlignmentStatus) Valid() bool {
+	switch s {
+	case AlignmentMet, AlignmentGap, AlignmentExtra, AlignmentUnclear:
+		return true
+	default:
+		return false
+	}
 }
 
-type Comment struct {
-	File     string   `json:"file"`
-	Line     int      `json:"line"`
-	Severity Severity `json:"severity"`
-	Body     string   `json:"body"`
-	Evidence Evidence `json:"evidence"`
+type Alignment struct {
+	Status AlignmentStatus `json:"status"`
+	Note   string          `json:"note"`
 }
 
-type Review struct {
-	Summary  string    `json:"summary"`
-	Comments []Comment `json:"comments"`
+type LookItem struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
+	Why  string `json:"why"`
+}
+
+type Briefing struct {
+	TicketSummary   string      `json:"ticket_summary"`
+	PRSummary       string      `json:"pr_summary"`
+	TicketAlignment []Alignment `json:"ticket_alignment"`
+	WhereToLook     []LookItem  `json:"where_to_look"`
+}
+
+type Usage struct {
+	Model        string `json:"model"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
 }
